@@ -101,7 +101,6 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
         )));
 
         let (persist_query_ch, persist_query_rx) = tokio::sync::mpsc::channel::<QueryMsg<K>>(MAX_SP_TASKS * 2); 
-        //let (lru_flush_ch, lru_flush_rx) = tokio::sync::mpsc::channel::<tokio::sync::mpsc::Sender<()>>(1);
         let (persist_shutdown_ch, persist_shutdown_rx) = tokio::sync::mpsc::channel::<u8>(1);
   
         let cache = Cache::<K,V>(Arc::new(tokio::sync::Mutex::new(InnerCache::<K,V>{
@@ -271,7 +270,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                 // release cache lock with value still locked - value now in cache, so next get on key will go to in-cache path
                 // ============================================================================================================
                 //let lru_guard = cache_guard.lru.lock().await;
-                let lru_ = cache_guard.lru.clone();
+                let lru_c = cache_guard.lru.clone();
                 drop(cache_guard);
                 // =======================
                 // IS NODE BEING PERSISTED 
@@ -282,7 +281,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                 }
                 before =Instant::now();
                 {
-                    let mut lru_guard=lru_.lock().await;
+                    let mut lru_guard=lru_c.lock().await;
                     lru_guard.attach(task, key.clone(), self.clone()).await;
                 }
                 waits.record(event_stats::Event::Attach,Instant::now().duration_since(before)).await; 
@@ -302,7 +301,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                 let waits = cache_guard.waits.clone();
                 let persisting = cache_guard.persisting(&key);
                 cache_guard.set_inuse(key.clone()); // prevents concurrent persist
-                let lru_ = cache_guard.lru.clone();
+                let lru_c = cache_guard.lru.clone();
                 // =========================
                 // release cache lock
                 // =========================
@@ -321,7 +320,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
 
                 before =Instant::now();    
                 {
-                    let mut lru_guard = lru_.lock().await;
+                    let mut lru_guard = lru_c.lock().await;
                     lru_guard.move_to_head(task, key.clone()).await;
                 }
                 waits.record(event_stats::Event::MoveToHead,Instant::now().duration_since(before)).await;

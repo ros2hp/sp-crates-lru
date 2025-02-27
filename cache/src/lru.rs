@@ -46,7 +46,7 @@ impl<K: Debug> Entry<K> {
 
 
 #[derive(Clone, Debug)]
-pub(crate) struct LRU<K: Send + Debug,V> {
+pub(crate) struct LRU<K : Debug,V> {
     capacity: usize,
     cnt : usize,
     // pointer to Entry value in the LRU linked list for a K
