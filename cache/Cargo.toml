@@ -1,0 +1,12 @@
+[package]
+name = "cache"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.40.0", features = ["full"] }
+trait-variant = "0.1.2"
+
+[dependencies.event_stats]
+version = "0.1.0"
+path = "event_stats"

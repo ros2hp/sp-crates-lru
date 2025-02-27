@@ -1,0 +1,13 @@
+[package]
+name = "event_stats"
+version = "0.1.0"
+edition = "2021"
+
+
+[lib]
+name = "event_stats"
+path = "src/lib.rs"
+proc-macro = false
+
+[dependencies]
+tokio = { version = "1.40.0", features = ["full"] }
