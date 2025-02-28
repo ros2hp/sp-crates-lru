@@ -19,7 +19,6 @@ use tokio::sync::Mutex;
 
 
 const LRU_CAPACITY : usize = 40;
-const MAX_SP_TASKS : usize = 18;
 
 pub enum CacheValue<V> {
     New(V),
@@ -87,12 +86,13 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
 {
 
     pub fn new<D: Clone + std::marker::Sync + Send + 'static >(
-        waits : event_stats::Waits
+        max_sp_tasks: usize 
+        ,waits : event_stats::Waits
         ,db : D
     ) -> Self
     where V: Persistence<K,D> {
 
-        let (persist_submit_ch, persist_submit_rx) = tokio::sync::mpsc::channel::<(usize, K, Arc<Mutex<V>>)>(MAX_SP_TASKS);
+        let (persist_submit_ch, persist_submit_rx) = tokio::sync::mpsc::channel::<(usize, K, Arc<Mutex<V>>)>(max_sp_tasks);
 
         let lru_ = Arc::new(tokio::sync::Mutex::new(lru::LRU::new( 
             LRU_CAPACITY
@@ -100,7 +100,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
             ,waits.clone()
         )));
 
-        let (persist_query_ch, persist_query_rx) = tokio::sync::mpsc::channel::<QueryMsg<K>>(MAX_SP_TASKS * 2); 
+        let (persist_query_ch, persist_query_rx) = tokio::sync::mpsc::channel::<QueryMsg<K>>(max_sp_tasks * 2); 
         let (persist_shutdown_ch, persist_shutdown_rx) = tokio::sync::mpsc::channel::<u8>(1);
   
         let cache = Cache::<K,V>(Arc::new(tokio::sync::Mutex::new(InnerCache::<K,V>{

@@ -37,7 +37,6 @@ use tokio::time::{sleep, Duration, Instant};
 //use tokio::task::spawn;
 
 const DYNAMO_BATCH_SIZE: usize = 25;
-const MAX_SP_TASKS : usize = 18;
 pub const LRU_CAPACITY : usize = 40;
 
 const LS: u8 = 1;
@@ -194,16 +193,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     let mysql_dbname =
         env::var("MYSQL_DBNAME").expect("env variable `MYSQL_DBNAME` should be set in profile");
     let graph = env::var("GRAPH_NAME").expect("env variable `GRAPH_NAME` should be set in profile");
+    let max_sp_tasks_ = env::var("MAX_SP_TASKS").expect("env variable `MAX_SP_TASKS` should be set in profile");
     let table_name = "RustGraph.dev.10";
     // ===========================
     // 2. Print config
     // ===========================
     println!("========== Config ===============  ");
-    println!("Config: MAX_SP_TASKS:   {}",MAX_SP_TASKS);
+    println!("Config: MAX_SP_TASKS:   {}",max_sp_tasks_);
     println!("Config: LRU_CAPACITY:   {}",LRU_CAPACITY);
     println!("Config: Table name:     {}",table_name);
+    println!("Config: Parallel load:     {}",table_name);
     println!("Config: DateTime :      {:?}",Instant::now());
     println!("=================================  ");
+
+    let max_sp_tasks  = usize::from_str_radix(&max_sp_tasks_,10).unwrap();
     // ===========================
     // 2. Create a Dynamodb Client
     // ===========================
@@ -231,7 +234,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     // =====================
     // setup Stats recorder 
     // =====================
-    let (stats_ch, mut stats_rx) = tokio::sync::mpsc::channel::<(event_stats::Event, Duration, Duration)>(MAX_SP_TASKS*10); 
+    let (stats_ch, mut stats_rx) = tokio::sync::mpsc::channel::<(event_stats::Event, Duration, Duration)>(max_sp_tasks*10); 
     let waits = event_stats::Waits::new(stats_ch.clone());
     // =====================
     // shutdown channel 
@@ -242,7 +245,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     // start Retry service (handles failed putitems)
     // =============================================
     println!("start Retry service...");
-    let (retry_ch, retry_rx) = tokio::sync::mpsc::channel(MAX_SP_TASKS * 2);
+    let (retry_ch, retry_rx) = tokio::sync::mpsc::channel(max_sp_tasks * 2);
     let retry_shutdown_ch = shutdown_broadcast_sender.subscribe();
     let retry_service = service::retry::start_service(
             dynamo_client.clone(),
@@ -258,7 +261,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     // 3. allocate cache - with database config
     // ===========================================
     let db: Dynamo = Dynamo::new(dynamo_client.clone(),table_name.to_string());
-    let reverse_edge_cache = Cache::<RKey, RNode>::new(waits.clone(), db); 
+    let reverse_edge_cache = Cache::<RKey, RNode>::new(max_sp_tasks, waits.clone(), db); 
 
     // ================================
     // 5. Setup a MySQL connection pool
@@ -331,12 +334,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     // 7. Setup asynchronous tasks infrastructure
     // ===========================================
     let mut tasks: usize = 0;
-    let (prod_ch, mut task_rx) = tokio::sync::mpsc::channel::<bool>(MAX_SP_TASKS);
+    let (prod_ch, mut task_rx) = tokio::sync::mpsc::channel::<bool>(max_sp_tasks);
     // ====================================
     // 8. Setup retry failed writes channel
     // ====================================
     let (retry_send_ch, retry_rx) =
-        tokio::sync::mpsc::channel::<Vec<aws_sdk_dynamodb::types::WriteRequest>>(MAX_SP_TASKS);
+        tokio::sync::mpsc::channel::<Vec<aws_sdk_dynamodb::types::WriteRequest>>(max_sp_tasks);
     // ===============================================================================
     // 9. process each parent_node and its associated edges (child nodes) in parallel
     // ===============================================================================
@@ -613,7 +616,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
         // =============================
         // 9.3 Wait for task to complete
         // =============================
-        if tasks == MAX_SP_TASKS {
+        if tasks == max_sp_tasks {
             task_rx.recv().await;
             tasks -= 1;
         }
