@@ -371,12 +371,11 @@ where K: std::cmp::Eq + std::hash::Hash + std::fmt::Debug + Clone + std::marker:
     }
 
     pub(crate) async fn flush(
-        self
-        ,cache : Cache<K,V>) {
+        &self         // self : &Self
+        ,cache_guard : &tokio::sync::MutexGuard<'_, InnerCache<K, V>>) {
                 println!("LRU service - flush lru ");
-                let mut entry = self.head;
+                let mut entry = self.head.clone();
                 let mut lc = 0;
-                let cache_guard = cache.0.lock().await;
                 println!("LRU flush in progress..persist entries in LRU flust {} lru entries",self.cnt);
                 while let Some(entry_) = entry {
                                             lc += 1;     

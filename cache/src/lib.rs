@@ -152,11 +152,11 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
 
         println!("cache: lru flush...");
         
-        let mut cache_guard = self.0.lock().await;
+        let mut cache_guard: tokio::sync::MutexGuard<'_, InnerCache<K, V>> = self.0.lock().await;
         {
             let lru_ = cache_guard.lru.clone();
             let lru_guard = lru_.lock().await;
-            lru_guard.clone().flush(self.clone()).await;
+            lru_guard.flush(&cache_guard).await;
         }
         drop(cache_guard);
 
