@@ -373,25 +373,25 @@ where K: std::cmp::Eq + std::hash::Hash + std::fmt::Debug + Clone + std::marker:
     pub(crate) async fn flush(
         &self         // self : &Self
         ,cache_guard : &tokio::sync::MutexGuard<'_, InnerCache<K, V>>) {
-                println!("LRU service - flush lru ");
-                let mut entry = self.head.clone();
-                let mut lc = 0;
-                println!("LRU flush in progress..persist entries in LRU flust {} lru entries",self.cnt);
-                while let Some(entry_) = entry {
-                                            lc += 1;     
-                                            let k = entry_.lock().await.key.clone();
-                                            if let Some(arc_node) = cache_guard.datax.get(&k) {
-                                                if let Err(err) = self.persist_submit_ch // persist_flush_ch
-                                                            .send((0, k, arc_node.clone()))
-                                                            .await {
-                                                                println!("Error on persist_submit_ch channel [{}]",err);
-                                                            }
-                                            } 
-                                            entry = entry_.lock().await.next.clone();      
-                                    }
-                                    //sleep(Duration::from_millis(2000)).await;
-                                    println!("LRU Flush complete ");
 
+        println!("LRU service - flush lru ");
+        let mut entry = self.head.clone();
+        println!("LRU flush in progress..persist entries in LRU flust {} lru entries",self.cnt);
+
+        while let Some(entry_) = entry { 
+            let k = entry_.lock().await.key.clone();
+            if let Some(arc_node) = cache_guard.datax.get(&k) {
+                        
+                if let Err(err) = 
+                                    self.persist_submit_ch // persist_flush_ch
+                                        .send((0, k, arc_node.clone()))
+                                        .await {
+                    println!("Error on persist_submit_ch channel [{}]",err);
+                }
+            } 
+            entry = entry_.lock().await.next.clone();      
+        }
+        println!("LRU Flush complete ");
 }
 
 }
