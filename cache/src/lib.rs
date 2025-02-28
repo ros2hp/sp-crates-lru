@@ -156,9 +156,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
             let lru_guard = lru_.lock().await;
             lru_guard.flush(&cache_guard).await;
         }
-        drop(cache_guard);
 
-        cache_guard = self.0.lock().await;
         if let Err(err) = cache_guard.persist_shutdown_ch.send(1).await {
             panic!("cache: LRU send on persist_shutdown_ch {} ",err);
         };
@@ -169,7 +167,6 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
         // lazy: wait for persist to complete. TODO: don't use sleep
         sleep(Duration::from_millis(5000)).await;
     }
-
 
 }
 
