@@ -148,8 +148,6 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
 
     pub async fn shutdown(&self) {
 
-        let (client_ch, mut client_rx) = tokio::sync::mpsc::channel::<()>(1); 
-
         println!("cache: lru flush...");
         
         let mut cache_guard: tokio::sync::MutexGuard<'_, InnerCache<K, V>> = self.0.lock().await;
@@ -160,10 +158,6 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
         }
         drop(cache_guard);
 
-        println!("cache: waiting lru flush to finish...");
-        let _ = client_rx.recv().await;
-        println!("cache: sleep.. wait for LRU persists to finish..."); 
-
         cache_guard = self.0.lock().await;
         if let Err(err) = cache_guard.persist_shutdown_ch.send(1).await {
             panic!("cache: LRU send on persist_shutdown_ch {} ",err);
@@ -172,7 +166,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
         if let Some(ref mut persist) = cache_guard.persist_srv {
             let _ = persist.await;
         }
-
+        // lazy: wait for persist to complete. TODO: don't use sleep
         sleep(Duration::from_millis(5000)).await;
     }
 
