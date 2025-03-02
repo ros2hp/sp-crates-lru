@@ -222,7 +222,7 @@ impl<K : Hash + Eq + Debug + Clone + Send,V : Clone + Debug >  InnerCache<K,V>
 impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Cache<K,V>
 {
 
-    pub async fn unlock(&mut self, key: &K) {
+    pub async fn unlock(&self, key: &K) {
         println!("CACHE: cache.unlock {:?}",key);
         self.0.lock().await.unset_inuse(key);
         println!("CACHE: cache.unlock DONE");
@@ -276,7 +276,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                     lru_guard.attach(task, key.clone(), self.clone()).await;
                 }
                 waits.record(event_stats::Event::Attach,Instant::now().duration_since(before)).await; 
-                self.unlock(rkey).await;
+                self.unlock(key).await;
 
                 return CacheValue::New(arc_value.clone());
             }
@@ -316,7 +316,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                     lru_guard.move_to_head(task, key.clone()).await;
                 }
                 waits.record(event_stats::Event::MoveToHead,Instant::now().duration_since(before)).await;
-                self.unlock(rkey).await;
+                self.unlock(key).await;
 
                 return CacheValue::Existing(arc_value.clone());
             }
