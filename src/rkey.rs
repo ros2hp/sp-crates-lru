@@ -38,9 +38,7 @@ impl RKey {
                               
                 node_guard.load_ovb_metadata(dyn_client, table_name, self, task).await;
                 node_guard.add_reverse_edge(target.clone(), id as u32);
-                println!("{} RKEY add_reverse_edge: New  2 about to cache.unlock {:?} ",task, self);
-                
-                cache.unlock(&self).await;
+
             }
 
             CacheValue::Existing(node) => {
@@ -49,9 +47,7 @@ impl RKey {
                 let mut node_guard = node.lock().await;
 
                 node_guard.add_reverse_edge(target.clone(), id as u32);
-                println!("{} RKEY add_reverse_edge: Existing  2 about to cache.unlock {:?} ",task, self);
-                
-                cache.unlock(&self).await;
+
             }
         }
 

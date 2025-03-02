@@ -276,6 +276,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                     lru_guard.attach(task, key.clone(), self.clone()).await;
                 }
                 waits.record(event_stats::Event::Attach,Instant::now().duration_since(before)).await; 
+                self.unlock(rkey).await;
 
                 return CacheValue::New(arc_value.clone());
             }
@@ -315,6 +316,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                     lru_guard.move_to_head(task, key.clone()).await;
                 }
                 waits.record(event_stats::Event::MoveToHead,Instant::now().duration_since(before)).await;
+                self.unlock(rkey).await;
 
                 return CacheValue::Existing(arc_value.clone());
             }

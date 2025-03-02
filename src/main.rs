@@ -202,7 +202,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     println!("Config: MAX_SP_TASKS:   {}",max_sp_tasks_);
     println!("Config: LRU_CAPACITY:   {}",LRU_CAPACITY);
     println!("Config: Table name:     {}",table_name);
-    println!("Config: Parallel load:     {}",table_name);
     println!("Config: DateTime :      {:?}",Instant::now());
     println!("=================================  ");
 
