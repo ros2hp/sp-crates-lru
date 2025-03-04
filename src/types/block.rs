@@ -6,9 +6,9 @@ use super::{
     as_luuid, as_n, as_string, as_string_trim_graph, as_uuid, as_vi32, as_vi8,
 };
 use aws_sdk_dynamodb::types::AttributeValue;
-use std::str::FromStr;
 #[warn(non_camel_case_types)]
-use std::{collections::HashMap};
+use std::collections::HashMap;
+use std::str::FromStr;
 //mod block {. // do not include in mod definition file
 use uuid::{self, Uuid}; //, as_vec_string};
 
@@ -68,7 +68,7 @@ pub const TARGET_ID: &str = "Target_id";
 // Reverse edge Overflow metadata - stored with child reverse edge only when OvB used
 //pub const OVB : &str = "OVB";     // List of UUIDs for OvBs
 pub const OVB_BID: &str = "OBID"; // List of current Batch ID in each OvB
-//pub const OVB_ID: &str = "OID"; // List of current index for each Batch
+                                  //pub const OVB_ID: &str = "OID"; // List of current index for each Batch
 pub const OVB_CUR: &str = "OCUR"; // ovb last used
 pub const OVB_CNT: &str = "OCNT"; // cnt in current overflow batch in current ovb
 
@@ -472,8 +472,8 @@ pub struct AttrItem {
     //    pub cd: Option<i16>, // cardinality - NOT USED
     //    pub sz: Option<i16>, // average size of attribute data - NOT USED
     pub ix: Option<String>, // supported indexes: FT=Full Text (S type only), "x" combined with Ty will index in GSI Ty_Ix
-                            //	pub incp: Vec<String>, // (optional). List of attributes to be propagated. If empty all scalars will be propagated.
-                            //	cardinality string   // 1:N , 1:1
+    //	pub incp: Vec<String>, // (optional). List of attributes to be propagated. If empty all scalars will be propagated.
+    //	cardinality string   // 1:N , 1:1
     pub rvsEdge: Option<bool>,
 }
 
@@ -543,7 +543,7 @@ pub struct AttrD {
     //	pub incp : Vec<String>,
     pub ix: String, // index type
     pub card: String,
-    pub rvsEdge: bool,   // sp load will populate a reverse edge on child node (defined on edge attribute of parent node)
+    pub rvsEdge: bool, // sp load will populate a reverse edge on child node (defined on edge attribute of parent node)
 }
 
 impl AttrD {

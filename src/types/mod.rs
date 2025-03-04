@@ -6,7 +6,8 @@ pub mod block;
 //pub use block::{ DataItem, NodeBlock};
 pub use block::{
     DataItem, NodeCache, B, BID, BL, CNT, DT, GRAPH, ISNODE, IX, LB, LBL, LN, LS, N, ND, OP, OVB,
-    OVB_BID, OVB_CUR, OVB_CNT, P, PARENT, PK, S, SB, SK, SK_, SN, SS, TUID, TY, XF, TARGET_UID, TARGET_ID, TARGET_BID,
+    OVB_BID, OVB_CNT, OVB_CUR, P, PARENT, PK, S, SB, SK, SK_, SN, SS, TARGET_BID, TARGET_ID,
+    TARGET_UID, TUID, TY, XF,
 };
 
 use std::collections::{HashMap, HashSet};
@@ -903,14 +904,13 @@ impl NodeType {
         );
     }
 
-    pub fn add_rvs_edge(&self, name : &str) -> bool {
-
+    pub fn add_rvs_edge(&self, name: &str) -> bool {
         for v in self {
             if v.dt.as_str() == "Nd" && name == v.name {
-                return v.rvsEdge
+                return v.rvsEdge;
             }
         }
-        panic!("Expected to find edge {}",name);
+        panic!("Expected to find edge {}", name);
     }
 
     pub fn get_attr_sn(&self, attr_nm: &str) -> &str {

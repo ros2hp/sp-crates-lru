@@ -66,7 +66,6 @@ pub struct InnerCache<K: Send + Debug,V> {
     persist_query_ch : tokio::sync::mpsc::Sender<QueryMsg<K>>,
     lru : Arc<tokio::sync::Mutex<lru::LRU<K,V>>>,
     // state of K in cache
-    //evicted : HashSet<K>,
     inuse : HashMap<K,u8>,
     persisting: HashSet<K>,
     // performance stats rep
@@ -223,9 +222,9 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
 {
 
     pub async fn unlock(&self, key: &K) {
-        println!("CACHE: cache.unlock {:?}",key);
+        //println!("CACHE: cache.unlock {:?}",key);
         self.0.lock().await.unset_inuse(key);
-        println!("CACHE: cache.unlock DONE");
+        //println!("CACHE: cache.unlock DONE");
     }
 
     pub async fn get(

@@ -179,7 +179,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
                         let persist_complete_send_ch_=persist_completed_send_ch.clone();
 
                         let Some(arc_node_) = persisting_lookup.0.get(&queued_Key) else {panic!("Persist service: expected arc_node in Lookup {:?}",queued_Key)};
-                        let arc_node=arc_node_.clone();
+                        let arc_node = arc_node_.clone();
                         let db=db.clone();
                         let waits=waits.clone();
                         let mut node_guard = arc_node_.lock().await.clone();

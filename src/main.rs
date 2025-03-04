@@ -5,7 +5,7 @@ mod service;
 mod types;
 
 extern crate cache;
-use cache::event_stats;//{Waits, Event};
+use cache::event_stats; //{Waits, Event};
 
 use std::collections::HashMap;
 use std::env;
@@ -14,8 +14,8 @@ use std::string::String;
 //use std::sync::LazyLock;
 use std::sync::Arc;
 
-use node::RNode;
 use cache::Cache;
+use node::RNode;
 
 use rkey::RKey;
 
@@ -37,7 +37,7 @@ use tokio::time::{sleep, Duration, Instant};
 //use tokio::task::spawn;
 
 const DYNAMO_BATCH_SIZE: usize = 25;
-pub const LRU_CAPACITY : usize = 40;
+pub const LRU_CAPACITY: usize = 40;
 
 const LS: u8 = 1;
 const LN: u8 = 2;
@@ -112,11 +112,11 @@ struct ParentEdge {
     rrobin_alloc: bool, // round robin ovb allocation applies (initially false)
     eattr_nm: String,   // edge attribute name (derived from sortk)
     eattr_sn: String,   // edge attribute short name (derived from sortk)
-    //
-    // ovb_idx: usize, // last ovb populated
-    // ovbs: Vec<Vec<OvBatch>>, //  each ovb is made up of batches. each ovb simply has a different pk - a batch shares the same pk.
-    //                          //
-                             //rvse: Vec<ReverseEdge>,
+                        //
+                        // ovb_idx: usize, // last ovb populated
+                        // ovbs: Vec<Vec<OvBatch>>, //  each ovb is made up of batches. each ovb simply has a different pk - a batch shares the same pk.
+                        //                          //
+                        //rvse: Vec<ReverseEdge>,
 }
 
 struct PropagateScalar {
@@ -134,7 +134,7 @@ struct PropagateScalar {
 }
 
 enum Operation {
-    Attach(ParentEdge),              // not used
+    Attach(ParentEdge), // not used
     Propagate(PropagateScalar),
 }
 
@@ -145,13 +145,16 @@ enum Operation {
 
 #[derive(Clone)]
 pub struct Dynamo {
-    pub  conn : DynamoClient,
-    pub table_name : String
+    pub conn: DynamoClient,
+    pub table_name: String,
 }
 
 impl Dynamo {
     fn new(conn: DynamoClient, table_name: impl ToString) -> Self {
-        Dynamo{conn, table_name: table_name.to_string()}
+        Dynamo {
+            conn,
+            table_name: table_name.to_string(),
+        }
     }
 }
 
@@ -176,11 +179,9 @@ impl Dynamo {
 //     }
 // }
 
-
 #[::tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>> {
-
-    let mut task : usize = 0;
+    let mut task: usize = 0;
     // ===============================
     // 1. Source environment variables
     // ===============================
@@ -193,19 +194,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     let mysql_dbname =
         env::var("MYSQL_DBNAME").expect("env variable `MYSQL_DBNAME` should be set in profile");
     let graph = env::var("GRAPH_NAME").expect("env variable `GRAPH_NAME` should be set in profile");
-    let max_sp_tasks_ = env::var("MAX_SP_TASKS").expect("env variable `MAX_SP_TASKS` should be set in profile");
+    let max_sp_tasks_ =
+        env::var("MAX_SP_TASKS").expect("env variable `MAX_SP_TASKS` should be set in profile");
     let table_name = "RustGraph.dev.10";
     // ===========================
     // 2. Print config
     // ===========================
     println!("========== Config ===============  ");
-    println!("Config: MAX_SP_TASKS:   {}",max_sp_tasks_);
-    println!("Config: LRU_CAPACITY:   {}",LRU_CAPACITY);
-    println!("Config: Table name:     {}",table_name);
-    println!("Config: DateTime :      {:?}",Instant::now());
+    println!("Config: MAX_SP_TASKS:   {}", max_sp_tasks_);
+    println!("Config: LRU_CAPACITY:   {}", LRU_CAPACITY);
+    println!("Config: Table name:     {}", table_name);
+    println!("Config: DateTime :      {:?}", Instant::now());
     println!("=================================  ");
 
-    let max_sp_tasks  = usize::from_str_radix(&max_sp_tasks_,10).unwrap();
+    let max_sp_tasks = usize::from_str_radix(&max_sp_tasks_, 10).unwrap();
     // ===========================
     // 2. Create a Dynamodb Client
     // ===========================
@@ -231,13 +233,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     let (shutdown_broadcast_sender, _) = broadcast::channel(1); // broadcast::channel::<u8>(1);
 
     // =====================
-    // setup Stats recorder 
+    // setup Stats recorder
     // =====================
-    let (stats_ch, mut stats_rx) = tokio::sync::mpsc::channel::<(event_stats::Event, Duration, Duration)>(max_sp_tasks*10); 
+    let (stats_ch, mut stats_rx) =
+        tokio::sync::mpsc::channel::<(event_stats::Event, Duration, Duration)>(max_sp_tasks * 10);
     let waits = event_stats::Waits::new(stats_ch.clone());
     // =====================
-    // shutdown channel 
-    // =====================   
+    // shutdown channel
+    // =====================
     let stats_shutdown_ch = shutdown_broadcast_sender.subscribe();
 
     // =============================================
@@ -247,20 +250,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     let (retry_ch, retry_rx) = tokio::sync::mpsc::channel(max_sp_tasks * 2);
     let retry_shutdown_ch = shutdown_broadcast_sender.subscribe();
     let retry_service = service::retry::start_service(
-            dynamo_client.clone(),
-            retry_rx,
-            retry_ch.clone(),
-            retry_shutdown_ch,
-            table_name,
-        );
+        dynamo_client.clone(),
+        retry_rx,
+        retry_ch.clone(),
+        retry_shutdown_ch,
+        table_name,
+    );
 
     let stats_service = event_stats::start_event_service(stats_rx, stats_shutdown_ch);
 
     // ===========================================
     // 3. allocate cache - with database config
     // ===========================================
-    let db: Dynamo = Dynamo::new(dynamo_client.clone(),table_name.to_string());
-    let reverse_edge_cache = Cache::<RKey, RNode>::new(max_sp_tasks, waits.clone(), db); 
+    let db: Dynamo = Dynamo::new(dynamo_client.clone(), table_name.to_string());
+    let reverse_edge_cache = Cache::<RKey, RNode>::new(max_sp_tasks, waits.clone(), db);
 
     // ================================
     // 5. Setup a MySQL connection pool
@@ -368,7 +371,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
         let waits = waits.clone();
 
         tasks += 1; // concurrent task counter
-        task+=1;
+        task += 1;
 
         // =========================================
         // 9.2 spawn tokio task for each parent node
@@ -377,10 +380,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
             // ============================================
             // 9.2.3 propagate child scalar data to parent
             // ============================================
-            println!("********************** MAIN TASK {} [{}] ******************************",task, tasks);
- 
+            println!(
+                "********************** MAIN TASK {} [{}] ******************************",
+                task, tasks
+            );
+
             for (p_sk_edge, children) in p_sk_edges {
-            
                 // Container for Overflow Block Uuids, also stores all propagated data.
                 let mut ovb_pk: HashMap<String, Vec<Uuid>> = HashMap::new();
                 let mut items: HashMap<SortK, Operation> = HashMap::new();
@@ -630,7 +635,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
     }
     // task channel should be empty
     assert!(task_rx.is_empty());
-    println!("MAIN: Duration of SP: {:?}",Instant::now().duration_since(start_1));
+    println!(
+        "MAIN: Duration of SP: {:?}",
+        Instant::now().duration_since(start_1)
+    );
     //let _ = lru_service.await;
     // ==============
     // Shutdown cache
@@ -646,33 +654,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send + 'static>
 
     println!("MAIN: stats_service.await;");
     let _ = stats_service.await;
-  
+
     println!("MAIN: retry_service.await;");
     let _ = retry_service.await;
     println!("MAIN: EXIT ");
-
 
     Ok(())
 }
 
 async fn persist(
-    task: usize 
-    ,dyn_client: &DynamoClient
-    ,table_name: &str
-    //
-    ,cache: Cache<RKey,RNode>
-    //
-    ,mut bat_w_req: Vec<WriteRequest>
-    ,add_rvs_edge: bool
-    //
-    ,target_uid: Uuid
-    ,reverse_sk: String
-    //
-    ,retry_ch: tokio::sync::mpsc::Sender<Vec<aws_sdk_dynamodb::types::WriteRequest>>
-    ,ovb_pk: HashMap<String, Vec<Uuid>>
-    ,items: HashMap<SortK, Operation>
-    //
-    ,waits : event_stats::Waits
+    task: usize,
+    dyn_client: &DynamoClient,
+    table_name: &str, //
+    cache: Cache<RKey, RNode>, //
+    mut bat_w_req: Vec<WriteRequest>,
+    add_rvs_edge: bool, //
+    target_uid: Uuid,
+    reverse_sk: String, //
+    retry_ch: tokio::sync::mpsc::Sender<Vec<aws_sdk_dynamodb::types::WriteRequest>>,
+    ovb_pk: HashMap<String, Vec<Uuid>>,
+    items: HashMap<SortK, Operation>, //
+    waits: event_stats::Waits,
 ) {
     // create channels to communicate (to and from) lru eviction service
     // evict_resp_ch: sender - passed to eviction service so it can send its response back to this routine
@@ -761,24 +763,22 @@ async fn persist(
                         panic!("unexpected entry match in Operation::Propagate")
                     }
                 };
-                
-                bat_w_req = save_item(&dyn_client, bat_w_req, retry_ch.clone(), put, table_name).await;
+
+                bat_w_req =
+                    save_item(&dyn_client, bat_w_req, retry_ch.clone(), put, table_name).await;
 
                 if add_rvs_edge {
-
                     for (id, child) in children.into_iter().enumerate() {
-                        
                         let rkey = RKey::new(child.clone(), reverse_sk.clone());
                         rkey.add_reverse_edge(
-                            task
-                            , dyn_client
-                            , table_name
-                            //
-                            ,cache.clone()
-                            //
-                            , &target_uid
-                            , id          
-                        ).await;
+                            task,
+                            dyn_client,
+                            table_name, //
+                            cache.clone(), //
+                            &target_uid,
+                            id,
+                        )
+                        .await;
                     }
                 }
 
@@ -800,7 +800,7 @@ async fn persist(
                         let mut sk_w_bid = sk.clone();
                         sk_w_bid.push('%');
                         sk_w_bid.push_str(&bid.to_string());
-                        
+
                         let put = aws_sdk_dynamodb::types::PutRequest::builder();
                         let mut put = put
                             .item(types::PK, AttributeValue::B(Blob::new(ovb.clone())))
@@ -879,22 +879,21 @@ async fn persist(
                         }
 
                         bat_w_req =
-                            save_item(&dyn_client, bat_w_req, retry_ch.clone(), put, table_name).await;
+                            save_item(&dyn_client, bat_w_req, retry_ch.clone(), put, table_name)
+                                .await;
 
-                        if add_rvs_edge{
+                        if add_rvs_edge {
                             for (id, child) in children.into_iter().enumerate() {
-
-                                let rkey = RKey::new(child.clone(), reverse_sk.clone());                               
+                                let rkey = RKey::new(child.clone(), reverse_sk.clone());
                                 rkey.add_reverse_edge(
-                                    task
-                                    , dyn_client
-                                    , table_name
-                                    //
-                                    ,cache.clone()
-                                    //
-                                    , &ovb
-                                    , id           
-                                ).await;
+                                    task,
+                                    dyn_client,
+                                    table_name, //
+                                    cache.clone(), //
+                                    &ovb,
+                                    id,
+                                )
+                                .await;
                             }
                         }
                     }
@@ -983,7 +982,9 @@ async fn persist(
                             }
                         }
 
-                        bat_w_req = save_item(&dyn_client, bat_w_req, retry_ch.clone(), put, table_name).await;
+                        bat_w_req =
+                            save_item(&dyn_client, bat_w_req, retry_ch.clone(), put, table_name)
+                                .await;
 
                         if add_rvs_edge {
                             for (id, child) in children.into_iter().enumerate() {
@@ -991,16 +992,14 @@ async fn persist(
                                 // alternatively, manage addition of reverse edges via a "service" or separate load process.
                                 let rkey = RKey::new(child.clone(), reverse_sk.clone());
                                 rkey.add_reverse_edge(
-                                    task
-                                    , dyn_client
-                                    , table_name
-                                    //
-                                    ,cache.clone()
-                                    //
-                                    , &ovb
-                                    , id          
-                                ).await;
-
+                                    task,
+                                    dyn_client,
+                                    table_name, //
+                                    cache.clone(), //
+                                    &ovb,
+                                    id,
+                                )
+                                .await;
                             } //unlock cache and edgeItem locks
                         }
 
@@ -1015,19 +1014,17 @@ async fn persist(
         } // end match
 
         if bat_w_req.len() > 0 {
-        //print_batch(bat_w_req);
-            bat_w_req = persist_dynamo_batch(dyn_client, bat_w_req, retry_ch.clone(), table_name).await;
+            //print_batch(bat_w_req);
+            bat_w_req =
+                persist_dynamo_batch(dyn_client, bat_w_req, retry_ch.clone(), table_name).await;
         }
     } // end for
-    
+
     if bat_w_req.len() > 0 {
         //print_batch(bat_w_req);
         bat_w_req = persist_dynamo_batch(dyn_client, bat_w_req, retry_ch.clone(), table_name).await;
     }
 }
-
-
-
 
 //static LOAD_PROJ : LazyLock<String> = LazyLock::new(||types::OVB_s ) + "," + types::OVB_BID + "," + types::OVB_ID + "," + types::OVB_CUR;
 // static LOAD_PROJ: LazyLock<String> = LazyLock::new(|| {
@@ -1045,7 +1042,7 @@ async fn fetch_p_edge_meta<'a, T: Into<String>>(
     waits: event_stats::Waits,
 ) -> (&'a types::NodeType, Vec<Uuid>) {
     let proj = types::ND.to_owned() + "," + types::XF + "," + types::TY;
-    
+
     let before = Instant::now();
     let result = dyn_client
         .get_item()
@@ -1055,7 +1052,12 @@ async fn fetch_p_edge_meta<'a, T: Into<String>>(
         .projection_expression(proj)
         .send()
         .await;
-    waits.record(event_stats::Event::GetItem, Instant::now().duration_since(before)).await;
+    waits
+        .record(
+            event_stats::Event::GetItem,
+            Instant::now().duration_since(before),
+        )
+        .await;
 
     if let Err(err) = result {
         panic!(
@@ -1098,9 +1100,9 @@ async fn fetch_p_edge_meta<'a, T: Into<String>>(
         );
     }
 
-    let ovb_pk: Vec<Uuid> = di.nd.expect("nd is None").drain(ovb_start_idx..).collect();//TODO:consider split_off + mem::swap
-    // let mut ovb_pk: Vec<Uuid> = di.nd.as_mut().expect("nd is None").split_off(ovb_start_idx);
-    // mem::swap(&mut ovb_pk,  &mut di.nd.unwrap());
+    let ovb_pk: Vec<Uuid> = di.nd.expect("nd is None").drain(ovb_start_idx..).collect(); //TODO:consider split_off + mem::swap
+                                                                                         // let mut ovb_pk: Vec<Uuid> = di.nd.as_mut().expect("nd is None").split_off(ovb_start_idx);
+                                                                                         // mem::swap(&mut ovb_pk,  &mut di.nd.unwrap());
 
     (node_types.get(&di.ty.expect("ty is None")), ovb_pk)
 }
@@ -1112,7 +1114,6 @@ async fn save_item(
     put: PutRequestBuilder,
     table_name: &str,
 ) -> Vec<WriteRequest> {
-
     match put.build() {
         Err(err) => {
             println!("error in write_request builder: {}", err);
@@ -1122,7 +1123,7 @@ async fn save_item(
         }
     }
     //bat_w_req = print_batch(bat_w_req);
-    
+
     if bat_w_req.len() == DYNAMO_BATCH_SIZE {
         // =================================================================================
         // persist to Dynamodb
@@ -1131,7 +1132,6 @@ async fn save_item(
         //bat_w_req = print_batch(bat_w_req);
     }
     bat_w_req
-
 }
 
 async fn persist_dynamo_batch(
@@ -1140,8 +1140,6 @@ async fn persist_dynamo_batch(
     retry_ch: tokio::sync::mpsc::Sender<Vec<aws_sdk_dynamodb::types::WriteRequest>>,
     table_name: &str,
 ) -> Vec<WriteRequest> {
-
-    
     let bat_w_outp = dyn_client
         .batch_write_item()
         .request_items(table_name, bat_w_req)
@@ -1194,4 +1192,3 @@ fn print_batch(bat_w_req: Vec<WriteRequest>) -> Vec<WriteRequest> {
 
     new_bat_w_req
 }
-
