@@ -164,7 +164,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
             let _ = persist.await;
         }
         // lazy: wait for persist to complete. TODO: don't use sleep
-        sleep(Duration::from_millis(5000)).await;
+        //sleep(Duration::from_millis(5000)).await;
     }
 
 }
