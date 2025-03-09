@@ -154,7 +154,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
 
                     tasks-=1;
 
-                    if shutdown && tasks == 0 {
+                    if shutdown && tasks == 0 && pending_q.0.len() == 0 {
                         println!("Persist Service shutdown.");
                         return;
                     }
