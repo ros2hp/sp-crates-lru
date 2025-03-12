@@ -36,6 +36,8 @@ impl RKey {
                     .load_ovb_metadata(dyn_client, table_name, self, task)
                     .await;
                 node_guard.add_reverse_edge(target.clone(), id as u32);
+
+                cache.unlock(self);
             }
 
             CacheValue::Existing(node) => {
@@ -43,6 +45,8 @@ impl RKey {
                 let mut node_guard = node.lock().await;
 
                 node_guard.add_reverse_edge(target.clone(), id as u32);
+
+                cache.unlock(self);
             }
         }
     }
