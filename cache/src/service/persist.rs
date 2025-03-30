@@ -102,7 +102,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
     let persist_server = tokio::spawn(async move {
 
         loop {
-            //let persist_complete_send_ch_=persist_completed_send_ch.clone();
+            //let persist_completed_send_ch_=persist_completed_send_ch.clone();
             tokio::select! {
                 biased;         // removes random number generation - normal processing will determine order so select! can follow it.
                 // note: recv() is cancellable, meaning select! can cancel a recv() without loosing data in the channel.
@@ -128,7 +128,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
 
                             let mut node_guard=node_guard_.clone();
                             // spawn async task to persist node
-                            let persist_complete_send_ch_=persist_completed_send_ch.clone();
+                            let persist_completed_send_ch_=persist_completed_send_ch.clone();
                             let waits=waits.clone();
                             let db=db.clone();
                             
@@ -141,9 +141,15 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
                                     task
                                     ,db
                                     ,waits
-                                    ,persist_complete_send_ch_
                                 ).await;
-    
+                                    
+                                // send task completed msg to self
+                                if let Err(err) = persist_completed_send_ch_.send((key.clone(), task)).await {
+                                        println!(
+                                                "Sending completed persist msg to waiting client failed: {}",
+                                                err
+                                            );
+                                }
                             });
                         }
                         println!("{} PERSIST: submit - Exit",task);
@@ -182,7 +188,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
                     if let Some(queued_Key) = pending_q.0.pop_back() {
                         //println!("{} PERSIST : persist next entry in pending_q.... {:?}", task, queued_Key);
                         // spawn async task to persist node
-                        let persist_complete_send_ch_=persist_completed_send_ch.clone();
+                        let persist_completed_send_ch_=persist_completed_send_ch.clone();
 
                         let Some(arc_node_) = persisting_lookup.0.get(&queued_Key) else {panic!("Persist service: expected arc_node in Lookup {:?}",queued_Key)};
                         let arc_node = arc_node_.clone();
@@ -198,8 +204,15 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
                                 task
                                 ,db
                                 ,waits
-                                ,persist_complete_send_ch_
                             ).await;
+
+                            // send task completed msg to self
+                            if let Err(err) = persist_completed_send_ch_.send((queued_Key.clone(), task)).await {
+                                               println!(
+                                                "Sending completed persist msg to waiting client failed: {}",
+                                                 err
+                                                );
+                            }
                         });
                     }
                     //println!("{} PERSIST finished completed msg:  key {:?}  tasks {} ", task, persist_key, tasks);
@@ -257,7 +270,7 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
                             }
                             if let Some(queued_Key) = pending_q.0.pop_back() {
   
-                                let persist_complete_send_ch_=persist_completed_send_ch.clone();
+                                let persist_completed_send_ch_=persist_completed_send_ch.clone();
                                 let Some(arc_node_) = persisting_lookup.0.get(&queued_Key) else {panic!("Persist service: expected arc_node in Lookup")};
                                 let waits=waits.clone();
                                 let mut node_guard= arc_node_.lock().await.clone();
@@ -272,8 +285,14 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
                                         0
                                         ,db
                                         ,waits
-                                        ,persist_complete_send_ch_
                                     ).await;
+
+                                    if let Err(err) = persist_completed_send_ch_.send((queued_Key.clone(), 0)).await {
+                                        println!(
+                                         "Sending completed persist msg to waiting client failed: {}",
+                                          err
+                                         );
+                                    }                                    
                             });
                             }
                         }

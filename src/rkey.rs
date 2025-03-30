@@ -20,7 +20,7 @@ impl RKey {
         task: usize,
         dyn_client: &DynamoClient,
         table_name: &str, //
-        mut cache: Cache<RKey, RNode>, //
+        cache: Cache<RKey, RNode>, //
         target: &Uuid,
         id: usize,
     ) {
@@ -30,14 +30,14 @@ impl RKey {
         match cache.clone().get(&self, task).await {
             CacheValue::New(node) => {
                 println!("{} RKEY add_reverse_edge: New  1 {:?} ", task, self);
-                let mut node_guard = node.lock().await;
+                let mut node_guard: tokio::sync::MutexGuard<'_, RNode> = node.lock().await;
 
                 node_guard
                     .load_ovb_metadata(dyn_client, table_name, self, task)
                     .await;
                 node_guard.add_reverse_edge(target.clone(), id as u32);
 
-                cache.unlock(self);
+                cache.unlock(self).await;
             }
 
             CacheValue::Existing(node) => {
@@ -46,7 +46,7 @@ impl RKey {
 
                 node_guard.add_reverse_edge(target.clone(), id as u32);
 
-                cache.unlock(self);
+                cache.unlock(self).await;
             }
         }
     }

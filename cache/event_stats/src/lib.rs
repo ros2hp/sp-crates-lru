@@ -21,6 +21,11 @@ pub enum Event {
     // Operations
     MoveToHead,
     Attach,
+    GetInCache,
+    GetNotInCache,
+    GetPersistingCheckInCache,
+    GetPersistingCheckNotInCache,
+    LRUevicting,
     // Dynamodb
     GetItem,
     PersistEmbedded,

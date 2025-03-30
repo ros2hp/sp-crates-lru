@@ -34,7 +34,6 @@ pub trait Persistence_<K, D>
         ,task : usize
         ,db : D
         ,waits : event_stats::Waits
-        ,persist_completed_send_ch : tokio::sync::mpsc::Sender<(K, usize)>
     );
 }
 
@@ -51,7 +50,38 @@ pub trait NewValue<K: Clone,V> {
 
     fn new_with_key(key : &K) -> Arc<tokio::sync::Mutex<V>>;
 }
+// pub struct C_V<V> {
+//     data: Arc<tokio::sync::Mutex<V>>,
+//     inuse : u8,
+//     persisting : bool,
+// }
 
+// impl<V> C_V<V> {
+
+//     // pub fn new() -> Self {
+//     //     Self{ data: Arc::new(tokio::sync::Mutex::new()),
+//     //          inuse: 0,
+//     //          persisting : false
+//     //     }
+//     // }
+//     pub fn inuse(&mut self) -> bool {
+//         self.inuse > 0
+//     }
+//     pub fn set_inuse(&mut self)  {
+//         self.inuse+=1;
+//     }
+//     pub fn unset_inuse(&mut self) {
+//         self.inuse-=1;
+//     }
+//     pub fn unlock(&mut self) {
+//         self.unset_inuser
+//     }
+
+//     pub cache_value(&mut self) -> Mutex_Guard<'_, > {
+//         self.data.lock().await;
+//     }
+
+// }
 // =======================
 //  Generic Cache that supports persistence
 // =======================
@@ -72,7 +102,6 @@ pub struct InnerCache<K: Send + Debug,V> {
     waits : event_stats::Waits,
     persist_shutdown_ch : tokio::sync::mpsc::Sender<u8>,
     persist_srv : Option<tokio::task::JoinHandle<()>>,
-
 }
 
 #[derive(Debug, Clone)]
@@ -229,13 +258,14 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
 
     pub async fn get(
         &self
-        ,key : &K
+        ,key : &K 
         ,task : usize,
-    ) -> CacheValue<Arc<tokio::sync::Mutex<V>>> {
+    ) -> CacheValue<Arc<tokio::sync::Mutex<V>>>  {  //CacheValue<Arc<tokio::sync::Mutex<V>>> {
         let (lru_client_ch, mut srv_resp_rx) = tokio::sync::mpsc::channel::<bool>(1); 
 
         let before:Instant;  
         let cache_ = self.0.clone();
+        let get_start = Instant::now();
         let mut cache_guard = cache_.lock().await;
         match cache_guard.datax.get(&key) {
             
@@ -243,7 +273,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                 println!("{} CACHE: - Not Cached: add to cache {:?}", task, key);
                 let waits = cache_guard.waits.clone();
                 let persist_query_ch = cache_guard.persist_query_ch.clone();
-                                // acquire lock on value and release cache lock - this prevents concurrent updates to value 
+                // acquire lock on value and release cache lock - this prevents concurrent updates to value 
                 // and optimises cache concurrency by releasing lock asap
                 let arc_value = V::new_with_key(key);
                 // =========================
@@ -266,8 +296,10 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                 // IS NODE BEING PERSISTED 
                 // =======================
                 if persisting {
-                    println!("{} CACHE: - Not Cached: waiting on persisting due to eviction {:?}",task, key);
+                    let before =Instant::now();
+                    //println!("{} CACHE: - Not Cached: waiting on persisting due to eviction {:?}",task, key);
                     self.wait_for_persist_to_complete(task, key.clone(),persist_query_ch, waits.clone()).await;
+                    waits.record(event_stats::Event::GetPersistingCheckNotInCache,Instant::now().duration_since(get_start)).await;    
                 }
                 before =Instant::now();
                 {
@@ -275,6 +307,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                     lru_guard.attach(task, key.clone(), self.clone()).await;
                 }
                 waits.record(event_stats::Event::Attach,Instant::now().duration_since(before)).await; 
+                waits.record(event_stats::Event::GetNotInCache,Instant::now().duration_since(get_start)).await; 
 
                 return CacheValue::New(arc_value.clone());
             }
@@ -304,8 +337,10 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                 // IS NODE persisting 
                 // ======================
                 if persisting {
-                    println!("{} CACHE key: in CACHE check if still persisting ....{:?}", task,key);
-                    self.wait_for_persist_to_complete(task, key.clone(),persist_query_ch, waits.clone()).await;       
+                    let before =Instant::now(); 
+                    //println!("{} CACHE key: in CACHE check if still persisting ....{:?}", task,key);
+                    self.wait_for_persist_to_complete(task, key.clone(),persist_query_ch, waits.clone()).await; 
+                    waits.record(event_stats::Event::GetPersistingCheckInCache,Instant::now().duration_since(get_start)).await;           
                 } 
 
                 before =Instant::now();    
@@ -314,6 +349,7 @@ impl<K: Hash + Eq + Clone + Debug + Send, V:  Clone + NewValue<K,V> + Debug>  Ca
                     lru_guard.move_to_head(task, key.clone()).await;
                 }
                 waits.record(event_stats::Event::MoveToHead,Instant::now().duration_since(before)).await;
+                waits.record(event_stats::Event::GetInCache,Instant::now().duration_since(get_start)).await; 
 
                 return CacheValue::Existing(arc_value.clone());
             }
