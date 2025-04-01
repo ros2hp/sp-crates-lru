@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 //pub use event_stats::{Waits,Event};
 
 
-const LRU_CAPACITY : usize = 40;
+const LRU_CAPACITY : usize = 10;
 
 pub enum CacheValue<V> {
     New(V),
