@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 //pub use event_stats::{Waits,Event};
 
 
-const LRU_CAPACITY : usize = 10;
+//const LRU_CAPACITY : usize = 10;
 
 pub enum CacheValue<V> {
     New(V),
@@ -117,13 +117,14 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + std::marker::Sync + Se
         max_sp_tasks: usize 
         ,waits : event_stats::Waits
         ,db : D
+        ,lru_capacity : usize
     ) -> Self
     where V: Persistence<K,D> {
 
         let (persist_submit_ch, persist_submit_rx) = tokio::sync::mpsc::channel::<(usize, K, Arc<Mutex<V>>)>(max_sp_tasks);
 
         let lru_ = Arc::new(tokio::sync::Mutex::new(lru::LRU::new( 
-            LRU_CAPACITY
+            lru_capacity
             ,persist_submit_ch
             ,waits.clone()
         )));
