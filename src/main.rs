@@ -37,7 +37,7 @@ use tokio::time::{sleep, Duration, Instant};
 //use tokio::task::spawn;
 
 const DYNAMO_BATCH_SIZE: usize = 25;
-pub const LRU_CAPACITY: usize = 40;
+pub const LRU_CAPACITY: usize = 10;
 
 const LS: u8 = 1;
 const LN: u8 = 2;
