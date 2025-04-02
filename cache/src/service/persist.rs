@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::task;
 use tokio::sync::Mutex;
 
-const MAX_PRESIST_TASKS: u8 = 8;
+const MAX_PRESIST_TASKS: u8 = 16;
 
 struct Lookup<K,V>(HashMap<K, Arc<Mutex<V>>>);
 
@@ -189,7 +189,9 @@ where K: Clone + std::fmt::Debug + Eq + std::hash::Hash + Send + 'static,
                         //println!("{} PERSIST : persist next entry in pending_q.... {:?}", task, queued_Key);
                         // spawn async task to persist node
                         let persist_completed_send_ch_=persist_completed_send_ch.clone();
-
+                        // 
+                        // Bug in next line - entry not found in persisting_lookup
+                        //
                         let Some(arc_node_) = persisting_lookup.0.get(&queued_Key) else {panic!("Persist service: expected arc_node in Lookup {:?}",queued_Key)};
                         let arc_node = arc_node_.clone();
                         let db=db.clone();
